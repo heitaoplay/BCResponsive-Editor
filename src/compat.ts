@@ -174,6 +174,52 @@ export function validateSettings(data: any): ResponsiveSettingV2 | null {
   };
 }
 
+/* --------------------- 损坏识别（导入失败时的友好提示） --------------------- */
+// 背景：用户从插件导出后，长串在复制 / 聊天传输中容易被改动一个字符，
+// 导致 lz-string 位流错位、整段无法解压。此时原始内容「看起来像」BCResponsive 压缩串，
+// 但 decompressFromBase64 直接返回空。这里尝试从干净前缀里识别出人格名，给出针对性提示。
+
+const LZ_BASE64_ALPHABET =
+  "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
+
+function looksLikeLZString(s: string): boolean {
+  if (s.length < 8) return false;
+  if (s.length % 4 !== 0) return false;
+  for (const c of s) if (!LZ_BASE64_ALPHABET.includes(c)) return false;
+  return true;
+}
+
+function detectCorruption(raw: string): string | null {
+  if (!looksLikeLZString(raw)) return null;
+  // 人格名（name）必定在导出字符串的开头附近。损坏往往发生在中段（字符被改动导致位流错位），
+  // 因此从开头起扫描「能解出合法 {name} 的最短干净前缀」即可定位到人格名。
+  // 为控制成本，只扫描前 8000 字符、步长 25（对真实人格导出足够覆盖 name 所在边界）。
+  let name: string | null = null;
+  const cap = Math.min(raw.length, 8000);
+  for (let len = 200; len <= cap; len += 25) {
+    const d = decompressFromBase64(raw.slice(0, len));
+    if (!d || d[0] !== "{") continue;
+    // 干净前缀往往只能解出「截断的 JSON」，JSON.parse 会失败；但 name 在开头，可被正则提取
+    try {
+      const j = JSON.parse(d);
+      if (j && typeof j === "object" && typeof j.name === "string") {
+        name = j.name;
+        break;
+      }
+    } catch {
+      const m = d.match(/"name"\s*:\s*"([^"]*)"/);
+      if (m) {
+        name = m[1];
+        break;
+      }
+    }
+  }
+  if (name) {
+    return `检测到这应该是人格「${name}」的 BCResponsive 导出代码，但数据中段似乎在复制 / 传输过程中损坏，无法完整解压。请重新从插件完整导出，并尽量使用「上传文件」方式导入（长文本复制容易在中间被改动）。`;
+  }
+  return `这看起来是 BCResponsive 的压缩代码，但已损坏或不完整，无法解压。请确认完整复制了插件导出的整段字符，或改用「上传文件」导入避免复制错误。`;
+}
+
 /* ----------------------------- 统一导入解析 ----------------------------- */
 // 支持三种输入：压缩串（单人格 / 全套）、原始 JSON（单人格对象 / 全套对象 / 人格数组）
 
@@ -203,9 +249,12 @@ export function parseInput(raw: string): ImportResult {
   // 2) 尝试 LZString 压缩串
   const d = decompressFromBase64(text);
   if (!d) {
+    // 增强：识别「看起来是 BCResponsive 压缩串但已损坏/不完整」的情况，给出更具体的引导
+    const hint = detectCorruption(text);
     return {
       ok: false,
       error:
+        hint ??
         "无法识别此内容：既不是有效的人格代码（可能复制不完整），也不是 JSON。请确认完整复制了插件导出的整段字符。",
     };
   }
