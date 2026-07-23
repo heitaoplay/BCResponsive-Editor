@@ -2,13 +2,15 @@ import { useEffect, useRef, useState } from "react";
 import type {
   ResponseItem,
   ResponseMessage,
+  ResponseTrigger,
+  ResponseMeta,
 } from "../types";
 import { newMessage } from "../compat";
 import { move, removeAt } from "../ops";
 import { TriggerEditor } from "./TriggerEditor";
 import { ConfirmInline } from "./ConfirmInline";
 import { useToast } from "./Toast";
-import { MODE_META, summarizeTrigger } from "./triggerSummary";
+import { MODE_META, summarizeTriggers } from "./triggerSummary";
 
 interface ResponseCardProps {
   index: number;
@@ -41,9 +43,12 @@ export function ResponseCard(props: ResponseCardProps) {
   const set = (patch: Partial<ResponseItem>) => onChange({ ...response, ...patch });
 
   const warn =
-    (response.trigger.mode === "activity" &&
-      (response.trigger as any).allow_activities?.length === 0) ||
-    response.messages.length === 0;
+    response.messages.length === 0 ||
+    !response.triggers.some(
+      (t) =>
+        t.mode !== "activity" ||
+        (t.allow_activities === undefined || (t.allow_activities?.length ?? 0) > 0)
+    );
 
   useEffect(() => {
     if (open && props.autoFocusName && nameRef.current) nameRef.current.focus();
@@ -52,7 +57,23 @@ export function ResponseCard(props: ResponseCardProps) {
   const updateMessage = (mi: number, fn: (m: ResponseMessage) => ResponseMessage) =>
     set({ messages: response.messages.map((m, idx) => (idx === mi ? fn(m) : m)) });
 
-  const summary = summarizeTrigger(response.trigger);
+  const updateTrigger = (ti: number, nt: ResponseTrigger) =>
+    set({ triggers: response.triggers.map((x, idx) => (idx === ti ? nt : x)) });
+  const addTrigger = () =>
+    set({ triggers: [...response.triggers, { mode: "activity", allow_activities: undefined }] });
+  const removeTrigger = (ti: number) => set({ triggers: removeAt(response.triggers, ti) });
+
+  const setMeta = (patch: Partial<ResponseMeta>) => {
+    const base: ResponseMeta = response.meta ?? {};
+    const next: ResponseMeta = { ...base, ...patch };
+    (Object.keys(next) as (keyof ResponseMeta)[]).forEach((k) => {
+      if (!next[k]) delete next[k];
+    });
+    set({ meta: Object.keys(next).length ? next : undefined });
+  };
+
+  const summary = summarizeTriggers(response.triggers);
+  const primaryMode = response.triggers[0]?.mode ?? "activity";
 
   return (
     <div
@@ -87,7 +108,10 @@ export function ResponseCard(props: ResponseCardProps) {
         />
         <span className="rc-name">{response.name || "(未命名)"}</span>
         <span className="rc-trigger" title={summary}>
-          <span className="rc-mode-ico">{MODE_META[response.trigger.mode].icon}</span>
+          <span className="rc-mode-ico">{MODE_META[primaryMode].icon}</span>
+          {response.triggers.length > 1 && (
+            <span className="rc-trig-count">×{response.triggers.length}</span>
+          )}
           {summary}
         </span>
         <span className="rc-msg" title="消息数">💬{response.messages.length}</span>
@@ -117,7 +141,35 @@ export function ResponseCard(props: ResponseCardProps) {
             }}
           />
 
-          <TriggerEditor trigger={response.trigger} onChange={(t) => set({ trigger: t })} />
+          <div className="sub-head row between">
+            <strong>触发条件（{response.triggers.length}）</strong>
+            <button
+              type="button"
+              className="btn small"
+              onClick={addTrigger}
+              title="新增一条触发规则（多触发表示满足任一即触发）"
+            >
+              + 触发
+            </button>
+          </div>
+          {response.triggers.map((t, ti) => (
+            <div className="trigger-slot" key={ti}>
+              <div className="trigger-slot-head">
+                <span className="muted">触发 {ti + 1}</span>
+                {response.triggers.length > 1 && (
+                  <button
+                    type="button"
+                    className="btn tiny danger"
+                    onClick={() => removeTrigger(ti)}
+                    title="删除此触发条件"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+              <TriggerEditor trigger={t} onChange={(nt) => updateTrigger(ti, nt)} />
+            </div>
+          ))}
 
           <div className="sub-head row between">
             <strong>消息（{response.messages.length}）</strong>
@@ -163,6 +215,38 @@ export function ResponseCard(props: ResponseCardProps) {
           >
             + 消息
           </button>
+
+          <div className="sub-head">
+            <strong>AI 协作元数据</strong>{" "}
+            <span className="muted">（不进 BC 执行，仅供外部 AI 理解意图 / 状态 / 标记）</span>
+          </div>
+          <label className="field-label">触发意图</label>
+          <textarea
+            className="meta-input"
+            value={response.meta?.intent ?? ""}
+            placeholder="例如：当玩家对我点头 / 微笑时（BC 无法真识别，仅作 AI 协作意图描述）"
+            onChange={(e) => setMeta({ intent: e.target.value })}
+          />
+          <div className="row">
+            <div className="grow">
+              <label className="field-label">状态变更</label>
+              <input
+                className="text-input"
+                value={response.meta?.state ?? ""}
+                placeholder="例如：进入顺从姿态"
+                onChange={(e) => setMeta({ state: e.target.value })}
+              />
+            </div>
+            <div className="grow">
+              <label className="field-label">标记信息</label>
+              <input
+                className="text-input"
+                value={response.meta?.marker ?? ""}
+                placeholder="例如：已惩罚"
+                onChange={(e) => setMeta({ marker: e.target.value })}
+              />
+            </div>
+          </div>
 
           <div className="rc-footer">
             <span

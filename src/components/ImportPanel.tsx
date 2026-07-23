@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { parseInput, type ImportResult } from "../compat";
+import { parseAIDoc } from "../ai";
 import type { ResponsivePersonality, ResponsiveSettingV2 } from "../types";
 
 interface ImportPanelProps {
@@ -10,19 +11,23 @@ interface ImportPanelProps {
   ) => void;
 }
 
-const SAMPLE = `// 也可以直接粘贴插件导出的「压缩代码」或原始 JSON。
-// 示例（原始 JSON，单人格）：
+const SAMPLE = `// 支持：插件「压缩代码」、原始 JSON、人格数组、全套设置，以及 AI 协作格式（Markdown / 注释 JSON）。
+// 示例（原始 JSON，单人格；triggers 为触发条件数组，可多条）：
 {
   "name": "示例人格",
   "responses": [
     {
       "name": "痛苦回应",
       "enabled": true,
-      "trigger": { "mode": "activity", "allow_activities": ["Slap","Bite","Spank"] },
+      "triggers": [
+        { "mode": "activity", "allow_activities": ["Slap","Bite","Spank"] },
+        { "mode": "orgasm", "type": "Any" }
+      ],
       "messages": [
         { "type": "message", "content": "嗷！" },
         { "type": "action", "content": "被抽打了一下" }
-      ]
+      ],
+      "meta": { "intent": "当玩家粗暴对待我时", "marker": "已惩罚" }
     }
   ],
   "blackList": []
@@ -41,7 +46,9 @@ export function ImportPanel({ onLoaded }: ImportPanelProps) {
     setError(null);
     setInfo(null);
     setDebugPreview(null);
-    const res: ImportResult = parseInput(raw);
+    // 优先尝试 AI 协作格式（Markdown / 注释 JSON），命中即返回；否则走 BC 压缩串 / 原始 JSON
+    const ai = parseAIDoc(raw);
+    const res: ImportResult = ai ?? parseInput(raw);
     if (!res.ok) {
       setError(res.error);
       if (res.debugPreview) setDebugPreview(res.debugPreview);
@@ -75,7 +82,8 @@ export function ImportPanel({ onLoaded }: ImportPanelProps) {
       <h2>导入数据</h2>
       <p className="muted">
         支持从 BCResponsive 插件导出的<strong>压缩代码</strong>、<strong>原始 JSON</strong>、<strong>人格数组</strong>或
-        <strong>全套设置</strong>导入。粘贴到下方文本框，或选择本地文件（.json / .txt）。
+        <strong>全套设置</strong>导入；也支持本工具导出的<strong>AI 协作格式</strong>（Markdown / 注释 JSON）。
+        粘贴到下方文本框，或选择本地文件（.json / .txt / .md）。
       </p>
 
       <label className="checkbox-row">

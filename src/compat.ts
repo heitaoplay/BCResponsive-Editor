@@ -13,6 +13,7 @@ import type {
   ResponseMessageType,
   ResponseTrigger,
   ResponseTriggerMode,
+  ResponseMeta,
   OrgasmTriggerType,
 } from "./types";
 
@@ -42,12 +43,21 @@ export function validatePersonality(
   for (const j of arg.responses as Partial<ResponseItem>[]) {
     if (typeof j !== "object" || j === null) continue;
     if (typeof j.name !== "string") continue;
-    if (typeof j.trigger !== "object" || j.trigger === null) continue;
+
+    // 兼容：优先读取 triggers[]；旧格式单 trigger 也可（归一化为数组）
+    const rawTriggers = Array.isArray((j as any).triggers)
+      ? (j as any).triggers
+      : (j as any).trigger
+        ? [(j as any).trigger]
+        : [];
+    const triggers: ResponseTrigger[] = [];
+    for (const t of rawTriggers as Partial<ResponseTrigger>[]) {
+      const vt = validateTrigger(t as ResponseTrigger);
+      if (vt) triggers.push(vt);
+    }
+    if (triggers.length === 0) continue; // 无合法触发 → 跳过该响应
 
     const enabled = j.enabled === undefined ? true : !!j.enabled;
-
-    const trigger = validateTrigger(j.trigger as ResponseTrigger);
-    if (!trigger) continue;
 
     if (!Array.isArray(j.messages)) continue;
     const messages: ResponseMessage[] = [];
@@ -58,13 +68,25 @@ export function validatePersonality(
       messages.push({ type: k.type, content: k.content });
     }
 
-    responses.push({ name: j.name, enabled, trigger, messages });
+    const meta = normalizeMeta((j as any).meta);
+
+    responses.push({ name: j.name, enabled, triggers, messages, meta });
   }
 
   return { name: arg.name, index: arg.index, responses, blackList };
 }
 
-function validateTrigger(t: ResponseTrigger): ResponseTrigger | null {
+// 从任意输入提取 AI 协作元数据（intent / state / marker），只保留字符串
+function normalizeMeta(m: any): ResponseMeta | undefined {
+  if (!m || typeof m !== "object") return undefined;
+  const out: ResponseMeta = {};
+  if (typeof m.intent === "string" && m.intent.trim()) out.intent = m.intent;
+  if (typeof m.state === "string" && m.state.trim()) out.state = m.state;
+  if (typeof m.marker === "string" && m.marker.trim()) out.marker = m.marker;
+  return Object.keys(out).length ? out : undefined;
+}
+
+export function validateTrigger(t: ResponseTrigger): ResponseTrigger | null {
   const modes: ResponseTriggerMode[] = ["activity", "orgasm", "spicer", "event"];
   if (!modes.includes(t.mode)) return null;
 
@@ -109,13 +131,33 @@ function validateTrigger(t: ResponseTrigger): ResponseTrigger | null {
 // 这里额外保留 blackList —— 插件的 V2ValidatePersonality 本就接受并保留该字段，
 // 因此对插件导入完全兼容，且更利于用户（避免黑名单在往返中丢失）。
 
+// 将网站内部模型（支持多触发）扁平化为 BC 插件兼容结构：
+// - 单触发：原样输出 { name, enabled, trigger, messages }
+// - 多触发：降级为多条「同名响应」，每条带一个 trigger（插件只认单触发）
+export function flattenPersonaForBC(p: ResponsivePersonality): {
+  name: string;
+  responses: any[];
+  blackList: number[];
+} {
+  const responses: any[] = [];
+  for (const r of p.responses) {
+    const base = { name: r.name, enabled: r.enabled, messages: r.messages };
+    if (r.triggers.length <= 1) {
+      responses.push({
+        ...base,
+        trigger: r.triggers[0] ?? { mode: "activity", allow_activities: undefined },
+      });
+    } else {
+      for (const t of r.triggers) {
+        responses.push({ ...base, name: r.name, trigger: t });
+      }
+    }
+  }
+  return { name: p.name, responses, blackList: p.blackList ?? [] };
+}
+
 export function personaToLZString(p: ResponsivePersonality): string {
-  const payload = {
-    name: p.name,
-    responses: p.responses,
-    blackList: p.blackList ?? [],
-  };
-  return compressToBase64(JSON.stringify(payload));
+  return compressToBase64(JSON.stringify(flattenPersonaForBC(p)));
 }
 
 export function lzStringToPersona(src: string): ResponsivePersonality | null {
@@ -136,7 +178,13 @@ export function lzStringToPersona(src: string): ResponsivePersonality | null {
 /* ----------------------- 全套设置（ExtensionSettings） ----------------------- */
 
 export function settingsToLZString(s: ResponsiveSettingV2): string {
-  return compressToBase64(JSON.stringify(s));
+  const flattened: ResponsiveSettingV2 = {
+    ...s,
+    personalities: s.personalities.map((p) =>
+      p ? (flattenPersonaForBC(p) as any) : p
+    ),
+  };
+  return compressToBase64(JSON.stringify(flattened));
 }
 
 export function lzStringToSettings(src: string): ResponsiveSettingV2 | null {
@@ -321,8 +369,9 @@ export function newResponse(name = "新响应"): ResponseItem {
   return {
     name,
     enabled: true,
-    trigger: { mode: "activity", allow_activities: undefined },
+    triggers: [{ mode: "activity", allow_activities: undefined }],
     messages: [],
+    meta: {},
   };
 }
 

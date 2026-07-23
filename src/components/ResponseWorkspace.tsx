@@ -69,16 +69,23 @@ export function ResponseWorkspace(props: ResponseWorkspaceProps) {
     set({ responses: move(persona.responses, from, to) });
   };
 
-  const isWarn = (r: ResponseItem) =>
-    (r.trigger.mode === "activity" && (r.trigger as any).allow_activities?.length === 0) ||
-    r.messages.length === 0;
+  const isWarn = (r: ResponseItem) => {
+    if (r.messages.length === 0) return true;
+    // 任一条触发能真正触发（活动需 allow_activities 非空数组以外）即不算「不触发」
+    const hasFiring = r.triggers.some(
+      (t) =>
+        t.mode !== "activity" ||
+        (t.allow_activities === undefined || (t.allow_activities?.length ?? 0) > 0)
+    );
+    return !hasFiring;
+  };
 
   const visible = useMemo(() => {
     const lower = q.trim().toLowerCase();
     return persona.responses
       .map((r, i) => ({ r, i }))
       .filter(({ r, i }) => {
-        if (filterMode !== "all" && r.trigger.mode !== filterMode) return false;
+        if (filterMode !== "all" && !r.triggers.some((t) => t.mode === filterMode)) return false;
         if (filterEnabled === "enabled" && !r.enabled) return false;
         if (filterEnabled === "disabled" && r.enabled) return false;
         if (warnOnly && !isWarn(r)) return false;

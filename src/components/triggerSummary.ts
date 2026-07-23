@@ -37,3 +37,20 @@ export function summarizeTrigger(t: ResponseTrigger): string {
   }
   return `事件 · ${t.event === "Join" ? "加入聊天" : "离开聊天"}`;
 }
+
+// 多触发摘要：满足任一即触发，用「 + 」连接每条触发条件
+export function summarizeTriggers(triggers: ResponseTrigger[]): string {
+  if (triggers.length === 0) return "无触发（不触发）";
+  if (triggers.length === 1) return summarizeTrigger(triggers[0]);
+  return (
+    triggers
+      .slice(0, 2)
+      .map((t) => summarizeTrigger(t))
+      .join(" + ") + (triggers.length > 2 ? ` +${triggers.length - 2}` : "")
+  );
+}
+
+// 用于筛选/校验的「首个活动触发」（保持与旧单触发逻辑一致）
+export function firstActivityTrigger(triggers: ResponseTrigger[]) {
+  return triggers.find((t) => t.mode === "activity") ?? null;
+}
