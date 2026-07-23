@@ -295,15 +295,15 @@ function parseJsonStructure(json: any): ImportResult | null {
   // 人格数组
   if (Array.isArray(json)) {
     const personas = json
-      .map((p) => validatePersonality(p))
+      .map((p) => validatePersonality({ ...p, index: p.index ?? -1 }))
       .filter((p): p is ResponsivePersonality => p !== null);
     if (personas.length === 0) return null;
     return { ok: true, kind: "personaArray", personas };
   }
 
-  // 单个单人格对象
+  // 单个单人格对象（插件 PersonaToLZString 只导出 {name, responses}，不含 index）
   if (typeof json.name === "string" && Array.isArray(json.responses)) {
-    const p = validatePersonality(json);
+    const p = validatePersonality({ ...json, index: -1 });
     if (!p) return null;
     return { ok: true, kind: "persona", personas: [p] };
   }
