@@ -71,12 +71,18 @@ export function buildAIMarkdown(p: ResponsivePersonality): string {
   lines.push(`# 人格：${p.name}`);
   lines.push("");
   lines.push(`> 黑名单(member ids)：${(p.blackList ?? []).join(", ") || "（无）"}`);
+  lines.push("");
+  lines.push("> **AI 编辑规则（必须遵守）：**");
   lines.push(
-    "> 说明：本文件供 AI 协作编辑。回导入时以文末的 `bcjson` 机器块为准（提供触发条件与结构，不要删除该块），"
+    "> 1. 你可自由改写每个响应下的【意图】/【[文本]】/【[动作]】/【[状态]】/【[标记]】文案，使其更自然或更符合角色。"
   );
   lines.push(
-    "> 上方散文中的「意图 / [文本] / [动作] / [状态] / [标记]」会被 AI 的修改覆盖回写；结构性的触发条件请改机器块。"
+    "> 2. 文末 `<!-- bcjson ... -->` 是机器结构化数据，**必须原样保留**：不要删除、不要改写、不要重新格式化、不要移动位置。回导入时以它为准。"
   );
+  lines.push(
+    "> 3. 触发条件（「满足任一即触发」下的条目）是游戏内事件结构，除非你完全确定字段格式，否则不要改动；如需调整请在机器块 `triggers` 中保持相同字段。"
+  );
+  lines.push("> 4. 不要增删「响应」条目，不要改变人格名。改完把整篇内容（含机器块）一起返回。");
   lines.push("");
   p.responses.forEach((r, i) => {
     const m = metaOf(r);
@@ -102,7 +108,16 @@ export function buildAIMarkdown(p: ResponsivePersonality): string {
 /* ----------------------------- 构建：注释 JSON ----------------------------- */
 
 export function buildAIJson(p: ResponsivePersonality): string {
-  return JSON.stringify({ format: AI_FORMAT, persona: personaToAIPayload(p) }, null, 2);
+  return JSON.stringify(
+    {
+      format: AI_FORMAT,
+      _edit_guide:
+        "BCResponsive AI 人格配置。可自由修改 responses 中每项的 name / intent / messages[].content / state / marker 文案；triggers 为触发条件结构，修改须保持原字段名与类型。不要修改 format 字段，不要增删响应条目，改完整体返回此 JSON。",
+      persona: personaToAIPayload(p),
+    },
+    null,
+    2
+  );
 }
 
 /* ----------------------------- 解析：回导入 ----------------------------- */
