@@ -15,6 +15,7 @@ interface ResponseCardProps {
   total: number;
   response: ResponseItem;
   autoFocusName?: boolean;
+  justAdded?: boolean;
   onChange: (r: ResponseItem) => void;
   onUp: () => void;
   onDown: () => void;
@@ -31,7 +32,7 @@ interface ResponseCardProps {
 // 响应卡片：折叠态常驻摘要（模式图标 + 触发条件 + 消息数 + 校验警告），展开态内联编辑。
 export function ResponseCard(props: ResponseCardProps) {
   const { index, total, response, onChange, onUp, onDown, onDelete } = props;
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(!!props.autoFocusName);
   const [confirming, setConfirming] = useState(false);
   const [armed, setArmed] = useState(false);
   const nameRef = useRef<HTMLInputElement>(null);
@@ -57,7 +58,7 @@ export function ResponseCard(props: ResponseCardProps) {
     <div
       className={`resp-card ${open ? "open" : ""} ${props.isDragging ? "dragging" : ""} ${
         props.isOver ? "drag-over" : ""
-      }`}
+      } ${props.justAdded ? "just-added" : ""}`}
       draggable={armed}
       onDragStart={(e) => {
         e.dataTransfer.effectAllowed = "move";

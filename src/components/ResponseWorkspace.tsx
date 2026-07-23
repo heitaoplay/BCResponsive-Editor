@@ -46,6 +46,7 @@ export function ResponseWorkspace(props: ResponseWorkspaceProps) {
     set({ responses: [...persona.responses, nr] });
     setLastAdded(at);
     toast.push("已新增响应", "success");
+    window.setTimeout(() => setLastAdded((cur) => (cur === at ? null : cur)), 1200);
   };
 
   const duplicateResponse = (ri: number) => {
@@ -202,6 +203,7 @@ export function ResponseWorkspace(props: ResponseWorkspaceProps) {
             total={persona.responses.length}
             response={r}
             autoFocusName={lastAdded === i}
+            justAdded={lastAdded === i}
             onChange={(nr) => updateResponse(i, () => nr)}
             onUp={() => reorder(i, i - 1)}
             onDown={() => reorder(i, i + 1)}
