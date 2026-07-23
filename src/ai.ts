@@ -12,7 +12,7 @@ import type {
 } from "./types";
 import { validateTrigger, type ImportResult } from "./compat";
 
-const AI_FORMAT = "bcresponsive-ai/v1";
+const AI_FORMAT = "bcresponsive-ai/v1.1";
 
 /* ----------------------------- 触发器 → 人话 ----------------------------- */
 
@@ -271,3 +271,4 @@ export function parseAIDoc(text: string): ImportResult | null {
   }
   return null;
 }
+// cache-bust 1784813021
