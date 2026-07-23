@@ -230,7 +230,7 @@ export type ImportResult =
       personas: ResponsivePersonality[];
       settings?: ResponsiveSettingV2;
     }
-  | { ok: false; error: string };
+  | { ok: false; error: string; debugPreview?: string };
 
 export function parseInput(raw: string): ImportResult {
   const text = raw.trim();
@@ -269,9 +269,15 @@ export function parseInput(raw: string): ImportResult {
   }
   const fromJson = parseJsonStructure(data);
   if (fromJson) return fromJson;
+  // 调试：展示解压后的实际结构，帮助定位插件导出格式差异
+  const preview =
+    typeof data === "string"
+      ? data.slice(0, 300)
+      : JSON.stringify(data, null, 2).slice(0, 500);
   return {
     ok: false,
     error: "数据结构无法识别：解压后的内容不符合人格或全套设置的格式。",
+    debugPreview: preview,
   };
 }
 

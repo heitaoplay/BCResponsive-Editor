@@ -35,12 +35,16 @@ export function ImportPanel({ onLoaded }: ImportPanelProps) {
   const [append, setAppend] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  const [debugPreview, setDebugPreview] = useState<string | null>(null);
+
   const doParse = (raw: string) => {
     setError(null);
     setInfo(null);
+    setDebugPreview(null);
     const res: ImportResult = parseInput(raw);
     if (!res.ok) {
       setError(res.error);
+      if (res.debugPreview) setDebugPreview(res.debugPreview);
       return;
     }
     const kindText =
@@ -101,6 +105,12 @@ export function ImportPanel({ onLoaded }: ImportPanelProps) {
       </div>
 
       {error && <div className="alert error">{error}</div>}
+      {debugPreview && (
+        <details className="help" open>
+          <summary>🔍 解压后的原始内容（调试信息）</summary>
+          <pre className="debug-preview">{debugPreview}</pre>
+        </details>
+      )}
       {info && <div className="alert success">{info}</div>}
 
       <details className="help">
