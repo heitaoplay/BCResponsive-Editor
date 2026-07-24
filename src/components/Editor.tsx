@@ -52,8 +52,13 @@ function EditorInner({ personas, setPersonas }: EditorProps) {
   return (
     <div className="panel editor-panel">
       {personas.length === 0 ? (
-        <div className="alert">
-          暂无人格。点「新建人格」从零开始，或到「导入」页载入插件数据。
+        <div className="editor-empty">
+          <div className="alert">
+            暂无人格。点下方按钮从零开始，或到「导入」页载入插件数据。
+          </div>
+          <button type="button" className="btn primary" onClick={addPersona}>
+            + 新建人格
+          </button>
         </div>
       ) : (
         <div className="editor-layout">
