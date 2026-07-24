@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type {
   ResponseItem,
   ResponseMessage,
@@ -10,7 +10,7 @@ import { move, removeAt } from "../ops";
 import { TriggerEditor } from "./TriggerEditor";
 import { ConfirmInline } from "./ConfirmInline";
 import { useToast } from "./Toast";
-import { MODE_META, summarizeTriggers } from "./triggerSummary";
+import { MODE_META, summarizeTrigger } from "./triggerSummary";
 
 interface ResponseCardProps {
   index: number;
@@ -72,9 +72,6 @@ export function ResponseCard(props: ResponseCardProps) {
     set({ meta: Object.keys(next).length ? next : undefined });
   };
 
-  const summary = summarizeTriggers(response.triggers);
-  const primaryMode = response.triggers[0]?.mode ?? "activity";
-
   return (
     <div
       className={`resp-card ${open ? "open" : ""} ${props.isDragging ? "dragging" : ""} ${
@@ -93,7 +90,7 @@ export function ResponseCard(props: ResponseCardProps) {
       onDragEnter={() => props.onDragEnter(index)}
       data-rindex={index}
     >
-      {/* 折叠态摘要 */}
+      {/* 折叠态摘要：触发胶囊（呼应插件 活动/部位/成员 三按钮） */}
       <div className="rc-summary" onClick={() => setOpen(true)}>
         <button
           type="button"
@@ -107,13 +104,10 @@ export function ResponseCard(props: ResponseCardProps) {
           }}
         />
         <span className="rc-name">{response.name || "(未命名)"}</span>
-        <span className="rc-trigger" title={summary}>
-          <span className="rc-mode-ico">{MODE_META[primaryMode].icon}</span>
-          {response.triggers.length > 1 && (
-            <span className="rc-trig-count">×{response.triggers.length}</span>
-          )}
-          {summary}
-        </span>
+        <TriggerPills triggers={response.triggers} />
+        {response.triggers.length > 1 && (
+          <span className="rc-trig-count">×{response.triggers.length}</span>
+        )}
         <span className="rc-msg" title="消息数">💬{response.messages.length}</span>
         {warn && (
           <span className="badge warn" title="此响应当前不会被触发或无任何输出">
@@ -284,6 +278,54 @@ export function ResponseCard(props: ResponseCardProps) {
       )}
     </div>
   );
+}
+
+/* ----------------- 触发胶囊：呼应插件「触发活动/身体部位/成员」三按钮 ----------------- */
+function TriggerPills({ triggers }: { triggers: ResponseTrigger[] }) {
+  const pills: ReactNode[] = [];
+  triggers.forEach((t, ti) => {
+    const m = MODE_META[t.mode];
+    const group: ReactNode[] = [];
+    if (t.mode === "activity") {
+      group.push(
+        <span className="tpill act" key="act" title={`触发活动：${summarizeTrigger(t)}`}>
+          <span className="tp-ico">{m.icon}</span>
+          <span className="tp-v">{summarizeTrigger(t)}</span>
+        </span>
+      );
+      const bp = (t as any).allow_bodyparts;
+      if (Array.isArray(bp) && bp.length > 0) {
+        group.push(
+          <span className="tpill bp" key="bp" title={`触发身体部位：${bp.join(", ")}`}>
+            <span className="tp-ico">📍</span>
+            <span className="tp-v">部位·{bp.length}</span>
+          </span>
+        );
+      }
+      const ids = (t as any).allow_ids;
+      if (Array.isArray(ids) && ids.length > 0) {
+        group.push(
+          <span className="tpill mem" key="mem" title={`限制成员 ID：${ids.join(", ")}`}>
+            <span className="tp-ico">👥</span>
+            <span className="tp-v">成员·{ids.length}</span>
+          </span>
+        );
+      }
+    } else {
+      group.push(
+        <span className="tpill" key="m" title={summarizeTrigger(t)}>
+          <span className="tp-ico">{m.icon}</span>
+          <span className="tp-v">{summarizeTrigger(t)}</span>
+        </span>
+      );
+    }
+    pills.push(
+      <span key={ti} style={{ display: "inline-flex", gap: 5 }}>
+        {group}
+      </span>
+    );
+  });
+  return <span className="rc-triggers">{pills}</span>;
 }
 
 /* ----------------------------- 消息行 ----------------------------- */

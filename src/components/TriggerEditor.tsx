@@ -52,24 +52,39 @@ export function TriggerEditor({ trigger, onChange }: TriggerEditorProps) {
 
       {mode === "activity" && (
         <>
-          <ActivityPicker
-            label="触发活动 (allow_activities)"
-            value={(trigger as any).allow_activities}
-            allHint="留空=全部活动；若选择若干项则仅这些活动触发；选「无」= 不触发任何。"
-            onChange={(v) => onChange({ mode: "activity", ...(trigger as any), allow_activities: v })}
-          />
-          <TagPicker
-            label="触发身体部位 (allow_bodyparts)"
-            value={(trigger as any).allow_bodyparts}
-            suggestions={BODYPART_SUGGESTIONS}
-            allHint="留空=全部部位。"
-            onChange={(v) => onChange({ mode: "activity", ...(trigger as any), allow_bodyparts: v })}
-          />
-          <NumberList
-            label="限制成员 ID (allow_ids)"
-            value={(trigger as any).allow_ids}
-            onChange={(v) => onChange({ mode: "activity", ...(trigger as any), allow_ids: v })}
-          />
+          <div className="trigger-field">
+            <div className="tf-head">
+              <span className="tf-ico act">🎯</span>触发活动
+            </div>
+            <ActivityPicker
+              label="allow_activities"
+              value={(trigger as any).allow_activities}
+              allHint="留空=全部活动；若选择若干项则仅这些活动触发；选「无」= 不触发任何。"
+              onChange={(v) => onChange({ mode: "activity", ...(trigger as any), allow_activities: v })}
+            />
+          </div>
+          <div className="trigger-field">
+            <div className="tf-head">
+              <span className="tf-ico bp">📍</span>触发身体部位
+            </div>
+            <TagPicker
+              label="allow_bodyparts"
+              value={(trigger as any).allow_bodyparts}
+              suggestions={BODYPART_SUGGESTIONS}
+              allHint="留空=全部部位。"
+              onChange={(v) => onChange({ mode: "activity", ...(trigger as any), allow_bodyparts: v })}
+            />
+          </div>
+          <div className="trigger-field">
+            <div className="tf-head">
+              <span className="tf-ico mem">👥</span>触发成员
+            </div>
+            <NumberList
+              label="allow_ids"
+              value={(trigger as any).allow_ids}
+              onChange={(v) => onChange({ mode: "activity", ...(trigger as any), allow_ids: v })}
+            />
+          </div>
         </>
       )}
 
